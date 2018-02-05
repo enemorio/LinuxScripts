@@ -4,20 +4,14 @@
 
 # mount RHEL 7.4 image
 
-cd /run/media/root/OS/RHEL7.4x86_64/
-mkdir /mnt/DVD
-mount RHEL *.iso /mnt/DVD
+mkdir -p /mnt/DVD             # If the directory you are trying to create lacks aparent -p will create all the chain of dirs for you
+mount /run/media/root/OS/RHEL7.4x86_64/RHEL*.iso /mnt/DVD
 
 # ipmitool installation
-cd /mnt/DVD/Packages/
-rpm -Uvh ipmitool*64*.rpm --nodeps --force
+rpm -Uvh /mnt/DVD/Packages/ipmitool*64*.rpm --nodeps --force
 
 # VSS installation
-cd /opt/BKCpkg/utility/ilVSS/ilvss-3.6.18.tar/ilvss-3.5.18/
-echo 'y' > y.txt
-echo 'y' >> y.txt
-
-./install --rpms=/mnt/DVD < y.txt
+yes | /opt/BKCpkg/utility/ilVSS/ilvss-3.6.18.tar/ilvss-3.5.18/./install --rpms=/mnt/DVD
 
 cd /opt/ilvss/
 dos2unix *
@@ -26,26 +20,24 @@ chmod +x **
 # ISSDCM installation
 cd /opt/BKCpkg/driver/fio-master/
 chmod +x **
-./configure
-make
-make install
+./configure && make && make install    # && operator chains together commands that depend on one another. If configure fails, make will not run
 
 # List ruler drivers and update them
 cd /opt/BKCpkg/driver/PCIe*
-echo 'y' > y.txt
-echo 'y' >> y.txt
 issdcm -drive_list >> /root/Desktop/drivelist.log
 
 BIN=$(ls | grep *.bin)
 
-for (( i=0;i<6;i++ )); do
-  issdcm -drive_index $i -firmware_update $BIN < y.txt | tee ~/Desktop/SW-update.log
+#for (( i=0;i<6;i++ )); do
+for i in $(seq 0 6); do         # A more pythonic approach to for iterations. Also, an introduction to seq
+  yes | issdcm -drive_index $i -firmware_update $BIN | tee ~/Desktop/SW-update.log
   echo '' >> ~/Desktop/SW-update.log
 done
 
 # Run FIO
 sleep 10
-for (( i=0;i<6;i++ )); do
+#for (( i=0;i<6;i++ )); do
+for i in $(seq 0 6); do 
   fio --bs=64k --numjobs=44 --iodepth=4 --loops=1 --direct=1 --invalidate=1 \
   --fsync_on_close=1 --randrepeat=1 --norandomma --time_based --runtime=60 \
   --filename=/dev/nvme"$i"n1 --name=read-phase --rw=randread >> ~/Desktop/nvme"$i"n1.log
